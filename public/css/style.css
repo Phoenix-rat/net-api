@@ -1,0 +1,11 @@
+h1.test {
+    color: red;
+}
+
+p.test {
+    color: blue;
+}
+
+body {
+    background-color: #000000!important;
+}
