@@ -6,6 +6,8 @@ const bodyParser = require('body-parser');
 const path = require('path');
 const axios = require('axios');
 const querystring = require('querystring');
+const { QuickDB } = require("quick.db");
+const db = new QuickDB();
 const ms = require('ms');
 const app = express();
 const port = 3000;
@@ -17,26 +19,6 @@ const uri = `mongodb+srv://${username}:${password}@${URL}/?retryWrites=true&w=ma
 const client_id = process.env.SPOTIFY_CLIENT_ID;
 const client_secret = process.env.SPOTIFY_CLIENT_SECRET;
 const redirect_uri = 'http://localhost:3000/callback';
-
-const client = new MongoClient(uri, {
-  serverApi: {
-    version: ServerApiVersion.v1,
-    strict: true,
-    deprecationErrors: true,
-  }
-});
-
-async function run() {
-  try {
-    await client.connect();
-    await client.db("NETAPI").command({ ping: 1 });
-    console.log("Connected successfully to server");
-  } catch (err) {
-    console.error("Error connecting to MongoDB:", err);
-  }
-}
-
-run().catch(console.dir);
 
 app.set('views', path.join(__dirname, '../views'));
 app.engine('handlebars', engine());
@@ -54,12 +36,6 @@ app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
 
-process.on('SIGINT', () => {
-  client.close().then(() => {
-    console.log("MongoDB connection closed");
-    process.exit(0);
-  });
-});
 
 const characters ='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
 function generateString(length) {
@@ -71,6 +47,7 @@ function generateString(length) {
 
     return result;
 }
+
 try {
 app.get('/login', (req, res) => {
   const state = generateString(16);
@@ -83,6 +60,7 @@ app.get('/login', (req, res) => {
     state: state
   })}`);
 });
+
 
 const processTopTracks = (userTopTracks) => {
   return userTopTracks.map((track) => {
@@ -114,11 +92,15 @@ app.get('/callback', async (req, res) => {
       headers: { 'Authorization': 'Bearer ' + access_token },
       params: { limit: 10 } // İstediğiniz sayıda en iyi parçayı alın
     });
+    const usernameget = await axios.get('https://api.spotify.com/v1/me', {
+      headers: { 'Authorization': 'Bearer ' + access_token },
+    });
+    const emails = usernameget.data.email;
     const userTopTracks = userTopTracksResponse.data.items;
-    const topTracksText = processTopTracks(userTopTracks).join(' / ');
-    res.json(topTracksText);
-  }); 
-} catch (error) {
+    const topTracksText = processTopTracks(userTopTracks).join(' \n ');
+    db.set(emails, topTracksText);
+    res.json(topTracksText); // En iyi parçalarınızı JSON olarak döndürün
+  }); } catch (error) {
   console.error(error);
   res.status(500).send('Bir hata oluştu');
 }
